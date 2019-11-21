@@ -4,6 +4,46 @@ import math
 import sys
 
 class TFFMLayer(tf.keras.layers.Layer):
+    """This class implements a layer which computes the output of FM.
+    --------
+    Parameters
+    --------
+    order : int, default: 2
+        Order of corresponding polynomial model.
+        All interaction from bias and linear to order will be included.
+
+    rank : int, default: 5
+        Number of factors in low-rank appoximation.
+        This value is shared across different orders of interaction.
+
+    init_std : float, default: 0.01
+        Amplitude of random initialization
+    
+    use_diag : bool, default: False
+        Use diagonal elements of weights matrix or not.
+        In the other words, should terms like x^2 be included.
+        Ofter reffered as a "Polynomial Network".
+        Default value (False) corresponds to FM.
+    
+    input_type :  str, 'dense' or 'sparse', default: 'dense'
+        Type of input data. Only numpy.array allowed for 'dense' and
+        scipy.sparse.csr_matrix for 'sparse'. 
+    
+    reweight_reg : bool, default: False
+        Use frequency of features as weights for regularization or not.
+        Should be useful for very sparse data and/or small batches
+
+    ---------
+    Attributes
+    ---------
+    w : array of tf.Variable, shape: [order]
+        Array of underlying representations.
+        First element will have shape [n_features, 1],
+        all the others -- [n_features, rank].
+
+    b : tf.Variable, shape: [1]
+        Bias term.
+    """
     def __init__(self, order=2, rank=2, init_std=0.01, use_diag=False, input_type='dense', reweight_reg=False):
         super(TFFMLayer, self).__init__()
         self.order = order
@@ -57,9 +97,8 @@ class TFFMLayer(tf.keras.layers.Layer):
                 norm = tf.reduce_mean(tf.pow(self.w[order - 1]*reweights, 2))
                 regularization += norm
         self.add_loss(regularization)
-        
 
-        # Outputs
+        # Computer outputs
         assert self.b is not None, 'n_feature is not set.'
         self.x_pow_cache = {}
         self.matmul_cache = {}
@@ -86,6 +125,8 @@ class TFFMLayer(tf.keras.layers.Layer):
         return outputs
 
 class TFFMCore(tf.keras.Model):
+    """This is a model which wraps the TFFMlayer
+    """
     
     def __init__(self, **layer_arguments): 
         super(TFFMCore, self).__init__()
@@ -96,8 +137,7 @@ class TFFMCore(tf.keras.Model):
     
     def call(self, inputs):
         output = self.fmlayer(inputs)
-        # print(self.fmlayer.weights)
-        # self.trainable_weights_ = [*self.fmlayer.w, self.fmlayer.b]
+        # assert self.trainable_weights_ == [*self.fmlayer.w, self.fmlayer.b]
         return output
 
 

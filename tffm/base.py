@@ -57,20 +57,19 @@ def batcher(X_, y_=None, w_=None, batch_size=-1):
 
 
 def batch_feed(X, input_type):
-    """Prepare feed dict for session.run() from mini-batch.
+    """Prepare inputs for session.run() from mini-batch.
     Convert sparse format into tuple (indices, values, shape) for tf.SparseTensor
+    ----------
     Parameters
     ----------
     X : {numpy.array, scipy.sparse.csr_matrix}, shape (batch_size, n_features)
         Training vector, where batch_size in the number of samples and
         n_features is the number of features.
-    y : np.array, shape (batch_size,)
-        Target vector relative to X.
-    core : TFFMCore
-        Core used for extract appropriate placeholders
+        
+    -------
     Returns
     -------
-    fd : dict
+    inputs : {tf.Tenfor, tf.SparseTensor}, shape (batch_size, n_features)
         Dict with formatted placeholders
     """
     if input_type == 'dense':
@@ -105,7 +104,7 @@ class TFFMBaseModel(six.with_metaclass(ABCMeta, BaseEstimator)):
 
     Support logging/visualization with TensorBoard.
 
-
+    ----------
     Parameters (for initialization)
     ----------
     batch_size : int, default: -1
@@ -130,27 +129,34 @@ class TFFMBaseModel(six.with_metaclass(ABCMeta, BaseEstimator)):
     verbose : int, default: 0
         Level of verbosity.
         Set 1 for tensorboard info only and 2 for additional stats every epoch.
+    
+    reg: flaot, default: 0
+        Strength of L2 regularization
+
+    optimizer: tf.keras.optimizers.Optimizer, default: Adam(learning_rate=0.01)
+        Optimizer used for training
+
+    loss_function : function: (tf.Op, tf.Op) -> tf.Op, default: None
+        Loss function.
+        Take 2 tf.Ops: outputs and targets and should return tf.Op of loss
+        See examples: .utils.loss_mse, .utils.loss_logistic
 
     kwargs : dict, default: {}
         Arguments for TFFMCore constructor.
         See TFFMCore's doc for details.
 
+    seed : int or None, default: None
+        Random seed used at core model creating time
+
+    ----------
     Attributes
     ----------
     core : TFFMCore or None
-        Computational graph with internal utils.
+        The core model 
         Will be initialized during first call .fit()
-
-    session : tf.Session or None
-        Current execution session or None.
-        Should be explicitly terminated via calling destroy() method.
 
     steps : int
         Counter of passed lerning epochs, used as step number for writing stats
-
-    n_features : int
-        Number of features used in this dataset.
-        Inferred during the first call of fit() method.
 
     intercept : float, shape: [1]
         Intercept (bias) term.
@@ -163,7 +169,7 @@ class TFFMBaseModel(six.with_metaclass(ABCMeta, BaseEstimator)):
     """
 
 
-    def init_basemodel(self, n_epochs=100, batch_size=-1, log_dir=None,verbose=0, 
+    def init_basemodel(self, n_epochs=100, batch_size=-1, log_dir=None, verbose=0, 
                        seed=None, pos_class_weight=None, input_type="dense", reg=0, 
                        optimizer=tf.keras.optimizers.Adam(learning_rate=0.01),
                        loss_function=None, **core_arguments):
@@ -187,8 +193,7 @@ class TFFMBaseModel(six.with_metaclass(ABCMeta, BaseEstimator)):
 
 
     def initialize_summary(self):
-        """Start computational session on builded graph.
-        Initialize summary logger (if needed).
+        """Initialize summary logger (if needed).
         """
         if self.need_logs:
             self.summary_writer = tf.summary.create_file_writer(self.log_dir)
@@ -197,7 +202,7 @@ class TFFMBaseModel(six.with_metaclass(ABCMeta, BaseEstimator)):
                 print('Initialize logs, use: \ntensorboard --logdir={}'.format(full_log_path))
 
     def execute_summary(self, step):
-        """Writing summary data with built writer
+        """Write summary data with built writer
         """
         with self.summary_writer.as_default():
             tf.summary.scalar('bias', self.core.fmlayer.b, step=step)
@@ -208,6 +213,9 @@ class TFFMBaseModel(six.with_metaclass(ABCMeta, BaseEstimator)):
 
     @tf.function
     def train(self, inputs, labels, sample_weights):
+        """Graph function for training the model
+        A graph is built and the training speed is boosted 
+        """
         with tf.GradientTape() as tape:
             pred = self.core(inputs)
             loss = self.loss_function(pred, labels) * sample_weights
@@ -219,6 +227,10 @@ class TFFMBaseModel(six.with_metaclass(ABCMeta, BaseEstimator)):
         return self.target
     
     def train_eager(self, inputs, labels, sample_weights):
+        """Eager function for training the model
+        The eager training function may be much slower than the graph version,
+        but it's easier to get the values of the variables in the funciton.
+        """
         with tf.GradientTape() as tape:
             pred = self.core(inputs)
             loss = self.loss_function(pred, labels) * sample_weights
@@ -231,6 +243,7 @@ class TFFMBaseModel(six.with_metaclass(ABCMeta, BaseEstimator)):
 
     def _fit(self, X_, y_, w_, n_epochs=None, show_progress=False):
 
+        # Initialize the learnable weights
         self.core.init_learnable_params(X_.shape[1])
 
         if self.need_logs:
@@ -284,7 +297,7 @@ class TFFMBaseModel(six.with_metaclass(ABCMeta, BaseEstimator)):
     @property
     def intercept(self):
         """Export bias term from tf.Variable to float."""
-        return self.core.b.numpy()
+        return self.core.fmlayer.b.numpy()
     @property
     def weights(self):
         """Export underlying weights from tf.Variables to np.arrays."""
