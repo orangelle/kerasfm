@@ -11,7 +11,7 @@ Most of the core parts are rewritten with Keras API, which is highly encouraged 
 - tensorflow2.0+
 
 # Usage
-Usage is a little different from the [original one](https://github.com/geffy/tffm#usage) because of the change fo the optimizer in tf2.0. 
+Usage is a little different from the [original one](https://github.com/geffy/tffm#usage) because of the change in the optimizer of tf2.0. 
 ```python
 from tffm import TFFMClassifier
 model = TFFMClassifier(
