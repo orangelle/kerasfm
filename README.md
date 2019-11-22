@@ -25,6 +25,3 @@ model = TFFMClassifier(
 )
 model.fit(X_tr, y_tr, show_progress=True)
 ```
-
-# Note
-In tensorflow2.0, the `tf.summary` function cannot visit the variables computed by a graph function. So, if the `log_dir` parameter is assigned a path, the training loop will automatically switch to eager mode to enable the logging. It may cause a significant slowdown in training.

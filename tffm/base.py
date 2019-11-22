@@ -209,10 +209,9 @@ class TFFMBaseModel(six.with_metaclass(ABCMeta, BaseEstimator)):
             tf.summary.scalar('regularization_penalty', self.regularization, step=step)
             tf.summary.scalar('loss', self.reduced_loss, step=step)
             tf.summary.scalar('target', self.target, step=step)
-            self.summary_writer.flush()
 
     @tf.function
-    def train(self, inputs, labels, sample_weights):
+    def train(self, inputs, labels, sample_weights, steps):
         """Graph function for training the model
         A graph is built and the training speed is boosted 
         """
@@ -224,6 +223,8 @@ class TFFMBaseModel(six.with_metaclass(ABCMeta, BaseEstimator)):
             self.target = self.reduced_loss + self.regularization
         grads = tape.gradient(self.target, self.core.trainable_weights)
         self.optimizer.apply_gradients(zip(grads, self.core.trainable_weights))
+        if self.need_logs:
+            self.execute_summary(steps)
         return self.target
     
     def train_eager(self, inputs, labels, sample_weights):
@@ -239,6 +240,9 @@ class TFFMBaseModel(six.with_metaclass(ABCMeta, BaseEstimator)):
             self.target = self.reduced_loss + self.regularization
         grads = tape.gradient(self.target, self.core.trainable_weights)
         self.optimizer.apply_gradients(zip(grads, self.core.trainable_weights))
+        # write stats 
+        if self.need_logs:
+            self.execute_summary(self.steps)
         return self.target
 
     def _fit(self, X_, y_, w_, n_epochs=None, show_progress=False):
@@ -266,13 +270,8 @@ class TFFMBaseModel(six.with_metaclass(ABCMeta, BaseEstimator)):
                 inputs = batch_feed(bX, self.input_type)
                 labels = tf.convert_to_tensor(bY.astype(np.float32), dtype = tf.float32)
                 sample_weights = tf.convert_to_tensor(bW.astype(np.float32), dtype = tf.float32)
-                
-                if self.need_logs:
-                    epoch_loss.append(self.train_eager(inputs, labels, sample_weights))
-                    # write stats 
-                    self.execute_summary(self.steps)
-                else:
-                    epoch_loss.append(self.train(inputs, labels, sample_weights))
+                epoch_loss.append(self.train(inputs, labels, sample_weights, tf.convert_to_tensor(self.steps,tf.int64)))
+                self.summary_writer.flush()
                 self.steps += 1
             if self.verbose > 1:
                     print('[epoch {}]: mean target value: {}'.format(epoch, np.mean(epoch_loss)))
