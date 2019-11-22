@@ -65,7 +65,7 @@ def batch_feed(X, input_type):
     X : {numpy.array, scipy.sparse.csr_matrix}, shape (batch_size, n_features)
         Training vector, where batch_size in the number of samples and
         n_features is the number of features.
-        
+
     -------
     Returns
     -------

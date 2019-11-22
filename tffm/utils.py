@@ -183,10 +183,10 @@ def count_nonzero_wrapper(X, optype):
     """
     with tf.name_scope('count_nonzero_wrapper') as scope:
         if optype == 'dense':
-            return tf.math.count_nonzero(X, axis=0, keep_dims=True)
-        elif optype == 'sparse':
+            return tf.math.count_nonzero(X, axis=0, keepdims=True)
+        elif optype == 'sparse':                    
             indicator_X = tf.SparseTensor(X.indices, tf.ones_like(X.values), X.dense_shape)
-            return tf.sparse.reduce_sum(indicator_X, axis=0, keep_dims=True)
+            return tf.sparse.reduce_sum(indicator_X, axis=0, keepdims=True)
         else:
             raise NameError('Unknown input type in count_nonzero_wrapper')
 
